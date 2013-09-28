@@ -8,17 +8,12 @@ class Report
 
   attr_accessor :rows
 
-  def initialize(table)
-    @rows = table
+  def initialize(rows)
+    @rows = rows # This can be either a CSV::Table or just an array of rows
   end
 
-  def get_rows_matching(field, value)
-    result = CSV::Table.new []
-    @rows.each do |row|
-      this = row[field]
-      result << row if this == value or (value == :any_not_nil and this) or value == :any
-    end
-    Report.new result
+  def filter (field, value)
+    Report.new( @rows.select { |row| row[field] == value } )
   end
 
   def split_rows_by_unique_value(field)
@@ -28,7 +23,7 @@ class Report
       if result.has_key? value
         result[value] << row
       else
-        result[value] = CSV::Table.new [row]
+        result[value] = [row]
       end
     end
     result.each do |key, table|
@@ -46,17 +41,17 @@ class Report
   end
 
   def duration_by_stage
-    {transcribing: get_rows_matching(:is_finished, 'No').duration,
-     ready_for_qa: get_rows_matching(:is_finished, 'Yes').get_rows_matching(:qa, nil).duration,
-     qa_in_progress: get_rows_matching(:qa_status, 'Expires').duration,
-     ready_for_review: get_rows_matching(:qa_status, 'Submitted').get_rows_matching(:status, 'In Progress').duration,
-     review_in_progress: get_rows_matching(:review_status, 'Expires').duration,
-     complete: get_rows_matching(:status, 'Completed').duration
+    {transcribing: get_rows(:is_finished, 'No').duration,
+     ready_for_qa: get_rows(:is_finished, 'Yes').get_rows(:qa, nil).duration,
+     qa_in_progress: get_rows(:qa_status, 'Expires').duration,
+     ready_for_review: get_rows(:qa_status, 'Submitted').get_rows(:status, 'In Progress').duration,
+     review_in_progress: get_rows(:review_status, 'Expires').duration,
+     complete: get_rows(:status, 'Completed').duration
     }
   end
 
   def yield_per_qa
-    files_qa = get_rows_matching(:qa_status, 'Submitted').split_rows_by_unique_value(:qa)
+    files_qa = get_rows(:qa_status, 'Submitted').split_rows_by_unique_value(:qa)
     result = {}
     files_qa.each do |key, report|
       result[key] = report.duration
@@ -89,6 +84,23 @@ class Report
       end
     end
     Report.new table
+  end
+
+  # Fix malformed csv due to commas in recording name
+  def self.fix_csv (filename, new_filename)
+
+    rows = CSV.read(filename)
+    out = CSV.open(new_filename, 'wb')
+
+    rows.each do |row|
+      if row.length > 12
+        offset = row.length - 8
+        rec_name = row.slice!(4..offset).join
+        row.insert(4, rec_name)
+      end
+      out << row
+    end
+    out.close
   end
 
 end
