@@ -4,6 +4,8 @@ require 'duration' # gem
 
 TEST_FILE = 'C:/Users/Isaac/Desktop/test_export.csv'
 
+SPANISH = [""]
+
 class Report
 
   attr_accessor :rows
@@ -50,6 +52,11 @@ class Report
     }
   end
 
+  # Generate EOD report by segment
+  def generate_report
+    spanish = @rows.select
+  end
+
   def yield_per_qa
     files_qa = get_rows(:qa_status, 'Submitted').split_rows_by_unique_value(:qa)
     result = {}
@@ -90,7 +97,6 @@ class Report
   def self.fix_csv (filename, new_filename)
 
     rows = CSV.read(filename)
-    out = CSV.open(new_filename, 'wb')
 
     rows.each do |row|
       if row.length > 12
@@ -98,9 +104,16 @@ class Report
         rec_name = row.slice!(4..offset).join
         row.insert(4, rec_name)
       end
-      out << row
     end
-    out.close
+
+    CSV.open(new_filename, 'wb') do |csv|
+      rows.each do |row|
+        csv << row
+      end
+    end
+
+    true
+
   end
 
 end
